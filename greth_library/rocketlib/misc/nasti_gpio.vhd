@@ -27,8 +27,8 @@ entity nasti_gpio is
     cfg  : out nasti_slave_config_type;
     i    : in  nasti_slave_in_type;
     o    : out nasti_slave_out_type;
-    i_dip : in std_logic_vector(3 downto 0);
-    o_led : out std_logic_vector(7 downto 0)
+    i_glip : in std_logic_vector(31 downto 0);
+    o_glip : out std_logic_vector(31 downto 0)
   );
 end; 
  
@@ -48,13 +48,8 @@ architecture arch_nasti_gpio of nasti_gpio is
        of integer;
 
   type bank_type is record
-    led : std_logic_vector(31 downto 0);
-    dip : std_logic_vector(31 downto 0);
-    reg32_2 : std_logic_vector(31 downto 0);
-    reg32_3 : std_logic_vector(31 downto 0);
-    reg32_4 : std_logic_vector(31 downto 0);
-    reg32_5 : std_logic_vector(31 downto 0);
-    reg32_6 : std_logic_vector(31 downto 0);
+    o_glip : std_logic_vector(31 downto 0);
+    i_glip : std_logic_vector(31 downto 0);
   end record;
   
   type registers is record
@@ -64,9 +59,7 @@ architecture arch_nasti_gpio of nasti_gpio is
 
   constant RESET_VALUE : registers := (
         NASTI_SLAVE_BANK_RESET,
-        ((others => '0'), (others => '0'), 
-         (others => '0'), (others => '0'), (others => '0'),
-         (others => '0'), (others => '0'))
+        ((others => '0'), (others => '0'))
   );
 
   signal r, rin : registers;
@@ -74,7 +67,7 @@ architecture arch_nasti_gpio of nasti_gpio is
 
 begin
 
-  comblogic : process(i, i_dip, r, nrst)
+  comblogic : process(i, i_glip, r, nrst)
     variable v : registers;
     variable raddr_reg : local_addr_array_type;
     variable waddr_reg : local_addr_array_type;
@@ -84,7 +77,8 @@ begin
   begin
 
     v := r;
-
+    v.bank0.o_glip(31 downto 30) := '0' & '0';
+    
     procedureAxi4(i, xconfig, r.bank_axi, v.bank_axi);
 
     for n in 0 to CFG_WORDS_ON_BUS-1 loop
@@ -92,13 +86,9 @@ begin
       tmp := (others => '0');
 
       case raddr_reg(n) is
-        when 0 => tmp := r.bank0.led;
-        when 1 => tmp := r.bank0.dip;
-        when 2 => tmp := r.bank0.reg32_2;
-        when 3 => tmp := r.bank0.reg32_3;
-        when 4 => tmp := r.bank0.reg32_4;
-        when 5 => tmp := r.bank0.reg32_5;
-        when 6 => tmp := r.bank0.reg32_6;
+        when 0 => tmp := r.bank0.o_glip;
+        when 1 => tmp := r.bank0.i_glip; v.bank0.o_glip(30) := '1';
+        when 2 => tmp := r.bank0.i_glip;
         when others =>
       end case;
       rdata(8*CFG_ALIGN_BYTES*(n+1)-1 downto 8*CFG_ALIGN_BYTES*n) := tmp;
@@ -115,23 +105,14 @@ begin
          tmp := i.w_data(32*(n+1)-1 downto 32*n);
 
          if conv_integer(wstrb(CFG_ALIGN_BYTES*(n+1)-1 downto CFG_ALIGN_BYTES*n)) /= 0 then
-           case waddr_reg(n) is
-             when 0 => v.bank0.led := tmp;
-             --when 1 => v.bank0.dip := tmp;
-             when 2 => v.bank0.reg32_2 := tmp;
-             when 3 => v.bank0.reg32_3 := tmp;
-             when 4 => v.bank0.reg32_4 := tmp;
-             when 5 => v.bank0.reg32_5 := tmp;
-             when 6 => v.bank0.reg32_6 := tmp;
-             when others =>
-           end case;
+           v.bank0.o_glip := '1' & tmp(30 downto 0);
          end if;
        end loop;
     end if;
 
     o <= functionAxi4Output(r.bank_axi, rdata);
 
-    v.bank0.dip(3 downto 0) := i_dip;
+    v.bank0.i_glip := i_glip;
     
     if nrst = '0' then
         v := RESET_VALUE;
@@ -142,7 +123,7 @@ begin
 
   cfg  <= xconfig;
   
-  o_led <= r.bank0.led(7 downto 0);
+  o_glip <= r.bank0.o_glip;
 
   -- registers:
   regs : process(clk)

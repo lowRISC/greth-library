@@ -48,11 +48,11 @@ use work.config_common.all;
 entity rocket_soc is port 
 ( 
   --! Input reset. Active High. Usually assigned to button "Center".
-  i_rst     : in std_logic;
-  --! DIP switch.
-  i_dip     : in std_logic_vector(3 downto 0);
-  --! LEDs.
-  o_led     : out std_logic_vector(7 downto 0);
+  i_rst       : in std_logic;
+  --! GLIP interface inputs
+  i_glip      : in std_logic_vector(31 downto 0);
+  --! GLIP interface outputs
+  o_glip      : out std_logic_vector(31 downto 0);
   --! Ethernet MAC PHY interface signals
   o_erefclk   : out   std_ulogic; -- RMII clock out
   i_gmiiclk_p : in    std_ulogic; -- GMII clock in
@@ -88,7 +88,6 @@ architecture arch_rocket_soc of rocket_soc is
   --!          through the dedicated buffere modules. For FPGA they are implemented
   --!          as an empty devices but ASIC couldn't be made without buffering.
   --! @{
-  signal ib_dip     : std_logic_vector(3 downto 0);
   signal ib_gmiiclk : std_logic;
   --! @}
 
@@ -115,10 +114,6 @@ architecture arch_rocket_soc of rocket_soc is
   signal irq_pins : std_logic_vector(CFG_IRQ_TOTAL-1 downto 0);
 begin
 
-  --! PAD buffers:
-  dipx : for i in 0 to 3 generate
-     idipz  : ibuf_tech generic map(CFG_PADTECH) port map (ib_dip(i), i_dip(i));
-  end generate;
   diffclk: if CFG_RMII = 0 generate 
   igbebuf0 : igdsbuf_tech generic map (CFG_PADTECH) port map (
             i_gmiiclk_p, i_gmiiclk_n, ib_gmiiclk);
@@ -164,8 +159,8 @@ wSysReset <= i_rst or not wPllLocked;
     cfg   => slv_cfg(CFG_NASTI_SLAVE_GPIO),
     i     => axisi,
     o     => axiso(CFG_NASTI_SLAVE_GPIO),
-    i_dip => ib_dip,
-    o_led => o_led
+    i_glip => i_glip,
+    o_glip => o_glip
   ); 
  
   --! @brief Ethernet MAC with the AXI4 interface.

@@ -9,8 +9,10 @@
 #include "iservice.h"
 #include "iudp.h"
 #include "ithread.h"
+#include "itap.h"
 #include <stdio.h>
 #include <string>
+#include "GlipTcp.h"
 
 #define JSON_CONFIG_FILE "config.json"
 using namespace debugger;
@@ -216,6 +218,32 @@ const AttributeType *getConfigOfService(const AttributeType &cfg,
     return 0;
 }
 
+static ITap *edcl_itap;
+static char tmp[256], old[256];
+
+int edcl_read(uint64_t addr, int bytes, uint8_t *obuf)
+{
+  int status = edcl_itap->read(addr,bytes,obuf);
+  sprintf(tmp, "edcl_read(0x%.8lX, %d, 0x%.8lX);", addr, bytes, *(uint64_t *)obuf);
+  if (strcmp(tmp,old))
+    {
+      puts(tmp);
+      strcpy(old,tmp);
+    }
+  return status;
+}
+
+int edcl_write(uint64_t addr, int bytes, uint8_t *ibuf)
+{
+  sprintf(tmp, "edcl_write(0x%.8lX, %d, 0x%.8lX);", addr, bytes, *(uint64_t *)ibuf);
+  if (strcmp(tmp,old))
+    {
+      puts(tmp);
+      strcpy(old,tmp);
+    }
+  return edcl_itap->write(addr,bytes,ibuf);
+}
+
 int main(int argc, char* argv[]) {
     int cfgsz = 0;
     char path[1024];
@@ -275,17 +303,23 @@ int main(int argc, char* argv[]) {
         iudp1->setTargetSettings(&t1);
     }
 
+    void *obj = glip_tcp_create(PORT, WIDTH);
+
     // Working cycle with console:
-    IThread *in = static_cast<IThread *>(
-        RISCV_get_service_iface("console0", IFACE_THREAD));
+    IThread *in = static_cast<IThread *>(RISCV_get_service_iface("console0", IFACE_THREAD));
+    edcl_itap = static_cast<ITap *>(RISCV_get_service_iface("edcltap", IFACE_TAP));
+
     if (in) {
         while (in->isEnabled()) {
             RISCV_sleep_ms(100);
+	    glip_tcp_toplevel(obj);
         }
     }
 
+    /*
     const char *t1 = RISCV_get_configuration();
     RISCV_write_json_file(cfg_filename.c_str(), t1);
+    */
 
     RISCV_cleanup();
 	return 0;

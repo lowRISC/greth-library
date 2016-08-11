@@ -52,7 +52,15 @@
                   
                   
                   
+                  
+                  
+                  
+                  
                   D[
+                    
+                    
+                    
+                    
                     
                     
                     
@@ -78,14 +86,20 @@
                     'csr CPUID',
                     'csr',
                     'loadelf helloworld',
-                    'read 0x80000000 4',
+                    'write 0x80000000 4 0x12345678',
                     '',
                     'read 0 4',
                     'write 0x80000000 4 0xff',
-                    'write 0x80000000 4 0xaa',
+                    'write 0x80000000 4 0x55',
                     'write 0x80000000 4 0x00',
                     'read 0x80040000 32',
-                    'write 0x80000000 4 0x55',
+                    'read 0x80000004 4',
+                    'write 0x80000000 4 0xaa',
+                    'read 0x80000000 4',
+                    'read 0x80000000 12',
+                    'write 0x80000000 4 0xc0000',
+                    'read 0x80000000 8',
+                    'write 0x80000000 4 0',
                     'exit']],
                 ['HistorySize',0x40],
                 [
@@ -151,7 +165,7 @@
               'Attr':[
                 ['LogLevel',0x1],
                 ['Transport','udpedcl'],
-                ['seq_cnt',0x2]]}]},
+                ['seq_cnt',0x1]]}]},
         {
           'Class':'ElfLoaderServiceClass',
           'Instances':[
