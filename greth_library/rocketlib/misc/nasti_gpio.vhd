@@ -63,11 +63,12 @@ architecture arch_nasti_gpio of nasti_gpio is
   );
 
   signal r, rin : registers;
-
+  signal r_istb, r_ostb, r_istb2, r_ostb2, r_istbin, r_ostbin : std_logic;
 
 begin
 
   comblogic : process(i, i_glip, r, nrst)
+    variable istb, ostb : std_logic;
     variable v : registers;
     variable raddr_reg : local_addr_array_type;
     variable waddr_reg : local_addr_array_type;
@@ -77,7 +78,8 @@ begin
   begin
 
     v := r;
-    v.bank0.o_glip(31 downto 30) := '0' & '0';
+    istb := '0';
+    ostb := '0';
     
     procedureAxi4(i, xconfig, r.bank_axi, v.bank_axi);
 
@@ -87,7 +89,7 @@ begin
 
       case raddr_reg(n) is
         when 0 => tmp := r.bank0.o_glip;
-        when 1 => tmp := r.bank0.i_glip; v.bank0.o_glip(30) := '1';
+        when 1 => tmp := r.bank0.i_glip; istb := '1';
         when 2 => tmp := r.bank0.i_glip;
         when others =>
       end case;
@@ -105,7 +107,7 @@ begin
          tmp := i.w_data(32*(n+1)-1 downto 32*n);
 
          if conv_integer(wstrb(CFG_ALIGN_BYTES*(n+1)-1 downto CFG_ALIGN_BYTES*n)) /= 0 then
-           v.bank0.o_glip := '1' & tmp(30 downto 0);
+           v.bank0.o_glip := tmp; ostb := '1' ;
          end if;
        end loop;
     end if;
@@ -119,17 +121,24 @@ begin
     end if;
   
     rin <= v;
+    r_istbin <= istb;
+    r_ostbin <= ostb;
   end process;
 
   cfg  <= xconfig;
   
-  o_glip <= r.bank0.o_glip;
+  o_glip <= (r_ostb and not r_ostb2) & (r_istb and not r_istb2) & r.bank0.o_glip(29 downto 0);
 
   -- registers:
   regs : process(clk)
   begin 
      if rising_edge(clk) then 
         r <= rin;
+        r_istb <= r_istbin;
+        r_ostb <= r_ostbin;
+        r_istb2 <= r_istb;
+        r_ostb2 <= r_ostb;
+        
      end if; 
   end process;
 
