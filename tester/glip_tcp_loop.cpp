@@ -25,6 +25,7 @@
  *   Wei Song <wsong83@gmail.com>
  */
 
+#include <string.h>
 #include "GlipTcp.h"
 
 enum {STATE_MASK_CTRL  = 1,
@@ -34,38 +35,56 @@ enum {STATE_MASK_CTRL  = 1,
 
 enum {SIZ = 4,
       WADDR = 0x80000000,
-      RADDR = 0x80000004};
+      RADDR = 0x80000004,
+      SADDR = 0x80000008};
 
 void glip_tcp_toplevel(void *obj)
 {
-
+  uint64_t status;
+  static char tmp[100], old[100];
   int connected = glip_tcp_connected(obj);
   if (connected <= 0) {
     long data = (1<<16);
     edcl_write(WADDR, SIZ, (uint8_t *)&data);
   }
-  
-  int state = glip_tcp_next_cycle(obj);
-  
-  // Get control message
-  if ((state & STATE_MASK_CTRL) != 0) {
-    long data = glip_tcp_control_msg(obj) & 1 ? 1<<17 : 0;
-    edcl_write(WADDR, SIZ, (uint8_t *)&data);
-  }
-  
-  // We have new incoming data
-  if ((state & STATE_MASK_READ) != 0) {
-    long data = glip_tcp_read(obj) & (1<<WIDTH)-1;
-    edcl_write(WADDR, SIZ, (uint8_t *)&data);
-    glip_tcp_read_ack(obj);
-  }
-  
-  // Write outgoing data
-  if ((state & STATE_MASK_WRITE) != 0) {
-    long data = 0;
-    edcl_read(RADDR, SIZ, (uint8_t *)&data);
-    if ((1<<16) & ~data) {
-      glip_tcp_write(obj, data & (1<<WIDTH)-1);
+  else
+    {
+      int state = glip_tcp_next_cycle(obj);
+      edcl_read(SADDR, SIZ, (uint8_t *)&status);
+      int owrcnt = (status >> 16) & 7;
+      int iwrcnt = (status >> 19) & 7;
+      int ordcnt = (status >> 22) & 7;
+      int irdcnt = (status >> 25) & 7;
+      int oempty = (status >> 28) & 1;
+      int iempty = (status >> 29) & 1;
+      int oerror = (status >> 30) & 1;
+      int ierror = (status >> 31) & 1;
+#ifdef VERBOSE
+      sprintf(tmp, "state = %X, iempty = %d, oempty = %d, iwrcnt=%d, owrcnt=%d", state, iempty, oempty, iwrcnt, owrcnt);
+      if (strcmp(old, tmp))
+	{
+	  puts(tmp);
+	  strcpy(old, tmp);
+	}
+#endif
+      // Get control message
+      if ((state & STATE_MASK_CTRL) != 0) {
+	long data = glip_tcp_control_msg(obj) & 1 ? 1<<17 : 0;
+	edcl_write(WADDR, SIZ, (uint8_t *)&data);
+      }
+      
+      // We have new incoming data
+      if ((state & STATE_MASK_READ) != 0) {
+	long data = glip_tcp_read(obj) & (1<<WIDTH)-1;
+	edcl_write(WADDR, SIZ, (uint8_t *)&data);
+	glip_tcp_read_ack(obj);
+      }
+      
+      // Write outgoing data
+      if (((state & STATE_MASK_WRITE) != 0) && !oempty) {
+	long data = 0;
+	edcl_read(RADDR, SIZ, (uint8_t *)&data);
+	glip_tcp_write(obj, data & (1<<WIDTH)-1);
+      }
     }
-  }
 }

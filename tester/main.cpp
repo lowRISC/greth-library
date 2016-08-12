@@ -224,23 +224,27 @@ static char tmp[256], old[256];
 int edcl_read(uint64_t addr, int bytes, uint8_t *obuf)
 {
   int status = edcl_itap->read(addr,bytes,obuf);
+#ifdef VERBOSE
   sprintf(tmp, "edcl_read(0x%.8lX, %d, 0x%.8lX);", addr, bytes, *(uint64_t *)obuf);
   if (strcmp(tmp,old))
     {
       puts(tmp);
       strcpy(old,tmp);
     }
+#endif
   return status;
 }
 
 int edcl_write(uint64_t addr, int bytes, uint8_t *ibuf)
 {
+#ifdef VERBOSE
   sprintf(tmp, "edcl_write(0x%.8lX, %d, 0x%.8lX);", addr, bytes, *(uint64_t *)ibuf);
   if (strcmp(tmp,old))
     {
       puts(tmp);
       strcpy(old,tmp);
     }
+#endif
   return edcl_itap->write(addr,bytes,ibuf);
 }
 
@@ -311,7 +315,7 @@ int main(int argc, char* argv[]) {
 
     if (in) {
         while (in->isEnabled()) {
-            RISCV_sleep_ms(100);
+	  //            RISCV_sleep_ms(100);
 	    glip_tcp_toplevel(obj);
         }
     }
